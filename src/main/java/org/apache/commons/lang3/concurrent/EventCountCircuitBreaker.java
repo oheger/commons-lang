@@ -1,3 +1,19 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.commons.lang3.concurrent;
 
 import java.util.EnumMap;
@@ -5,8 +21,123 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-
-public class TimedCircuitBreaker extends AbstractCircuitBreaker<Integer> {
+/**
+ * <p>
+ * A simple implementation of the <a
+ * href="http://martinfowler.com/bliki/CircuitBreaker.html">Circuit Breaker</a> pattern.
+ * </p>
+ * <p>
+ * A <em>circuit breaker</em> can be used to protect an application against unreliable
+ * services or unexpected load. A newly created {@code CircuitBreaker} object is initially
+ * in state <em>closed</em> meaning that no problem has been detected. When the
+ * application encounters errors, it tells the circuit breaker to increment an internal
+ * counter. If the number of errors reported in a specific time interval exceeds a
+ * configurable threshold, the circuit breaker changes into state <em>open</em>. This
+ * means that there is a problem with the associated sub system; the application should no
+ * longer call it, but give it some time to settle down. The circuit breaker can be
+ * configured to switch back to <em>closed</em> state after a certain time frame if the
+ * number of errors received goes below a threshold.
+ * </p>
+ * <p>
+ * When a {@code CircuitBreaker} object is constructed the following parameters can be
+ * provided:
+ * <ul>
+ * <li>A threshold for the number of events that causes a state transition to
+ * <em>open</em> state. If more events are received in the configured check interval, the
+ * circuit breaker switches to <em>open</em> state.</li>
+ * <li>The interval for checks whether the circuit breaker should open. So it is possible
+ * to specify something like "The circuit breaker should open if more than 10 errors are
+ * encountered in a minute."</li>
+ * <li>The same parameters can be specified for automatically closing the circuit breaker
+ * again, as in "If the number of requests goes down to 100 per minute, the circuit
+ * breaker should close itself again". Depending on the use case, it may make sense to use
+ * a slightly lower threshold for closing the circuit breaker than for opening it to avoid
+ * continuously flipping when the number of events received is close to the threshold.</li>
+ * </ul>
+ * </p>
+ * <p>
+ * This class supports the following typical use cases:
+ * </p>
+ * <p>
+ * <strong>Protecting against load peaks</strong>
+ * </p>
+ * <p>
+ * Imagine you have a server which can handle a certain number of requests per minute.
+ * Suddenly, the number of requests increases significantly - maybe because a connected
+ * partner system is going mad or due to a denial of service attack. A
+ * {@code CircuitBreaker} can be configured to stop the application from processing
+ * requests when a sudden peak load is detected and to start request processing again when
+ * things calm down. The following code fragment shows a typical example of such a
+ * scenario. Here the {@code CircuitBreaker} allows up to 1000 requests per minute before
+ * it interferes. When the load goes down again to 800 requests per second it switches
+ * back to state <em>closed</em>:
+ *
+ * <pre>
+ * CircuitBreaker breaker = new CircuitBreaker(1000, 1, TimeUnit.MINUTE, 800);
+ * ...
+ * public void handleRequest(Request request) {
+ *     if (breaker.incrementAndCheckState()) {
+ *         // actually handle this request
+ *     } else {
+ *         // do something else, e.g. send an error code
+ *     }
+ * }
+ * </pre>
+ *
+ * </p>
+ * <p>
+ * <strong>Deal with an unreliable service</strong>
+ * </p>
+ * <p>
+ * In this scenario, an application uses an external service which may fail from time to
+ * time. If there are too many errors, the service is considered down and should not be
+ * called for a while. This can be achieved using the following pattern - in this concrete
+ * example we accept up to 5 errors in 2 minutes; if this limit is reached, the service is
+ * given a rest time of 10 minutes:
+ *
+ * <pre>
+ * CircuitBreaker breaker = new CircuitBreaker(5, 2, TimeUnit.MINUTE, 5, 10, TimeUnit.MINUTE);
+ * ...
+ * public void handleRequest(Request request) {
+ *     if (breaker.checkState()) {
+ *         try {
+ *             service.doSomething();
+ *         } catch (ServiceException ex) {
+ *             breaker.incrementAndCheckState();
+ *         }
+ *     } else {
+ *         // return an error code, use an alternative service, etc.
+ *     }
+ * }
+ * </pre>
+ *
+ * </p>
+ * <p>
+ * In addition to automatic state transitions, the state of a circuit breaker can be
+ * changed manually using the methods {@link #open()} and {@link #close()}. It is also
+ * possible to register {@code PropertyChangeListener} objects that get notified whenever
+ * a state transition occurs. This is useful, for instance to directly react on a freshly
+ * detected error condition.
+ * </p>
+ * <p>
+ * <em>Implementation notes:</em>
+ * <ul>
+ * <li>This implementation uses non-blocking algorithms to update the internal counter and
+ * state. This should be pretty efficient if there is not too much contention.</li>
+ * <li>This implementation is not intended to operate as a high-precision timer in very
+ * short check intervals. It is deliberately kept simple to avoid complex and
+ * time-consuming state checks. It should work well in time intervals from a few seconds
+ * up to minutes and longer. If the intervals become too short, there might be race
+ * conditions causing spurious state transitions.</li>
+ * <li>The handling of check intervals is a bit simplistic. Therefore, there is no
+ * guarantee that the circuit breaker is triggered at a specific point in time; there may
+ * be some delay (less than a check interval).</li>
+ * </ul>
+ * </p>
+ *
+ * @since 3.4
+ */
+public class EventCountCircuitBreaker extends AbstractCircuitBreaker<Integer> {
 
     /** A map for accessing the strategy objects for the different states. */
     private static final Map<State, StateStrategy> STRATEGY_MAP = createStrategyMap();
@@ -42,9 +173,9 @@ public class TimedCircuitBreaker extends AbstractCircuitBreaker<Integer> {
      * @param closingInterval the interval for closing the circuit breaker
      * @param closingUnit the {@code TimeUnit} defining the closing interval
      */
-    public TimedCircuitBreaker(int openingThreshold, long openingInterval,
-            TimeUnit openingUnit, int closingThreshold, long closingInterval,
-            TimeUnit closingUnit) {
+    public EventCountCircuitBreaker(int openingThreshold, long openingInterval,
+                                    TimeUnit openingUnit, int closingThreshold, long closingInterval,
+                                    TimeUnit closingUnit) {
         super();
         checkIntervalData = new AtomicReference<CheckIntervalData>(new CheckIntervalData(0, 0));
         this.openingThreshold = openingThreshold;
@@ -66,8 +197,8 @@ public class TimedCircuitBreaker extends AbstractCircuitBreaker<Integer> {
      * number of events received in the time span determined by the check interval goes
      * below this threshold, the circuit breaker is closed again
      */
-    public TimedCircuitBreaker(int openingThreshold, long checkInterval, TimeUnit checkUnit,
-            int closingThreshold) {
+    public EventCountCircuitBreaker(int openingThreshold, long checkInterval, TimeUnit checkUnit,
+                                    int closingThreshold) {
         this(openingThreshold, checkInterval, checkUnit, closingThreshold, checkInterval,
                 checkUnit);
     }
@@ -82,7 +213,7 @@ public class TimedCircuitBreaker extends AbstractCircuitBreaker<Integer> {
      * @param checkInterval the check interval for opening or closing the circuit breaker
      * @param checkUnit the {@code TimeUnit} defining the check interval
      */
-    public TimedCircuitBreaker(int threshold, long checkInterval, TimeUnit checkUnit) {
+    public EventCountCircuitBreaker(int threshold, long checkInterval, TimeUnit checkUnit) {
         this(threshold, checkInterval, checkUnit, threshold);
     }
 
@@ -336,7 +467,7 @@ public class TimedCircuitBreaker extends AbstractCircuitBreaker<Integer> {
          * @param now the current time
          * @return a flag whether the end of the current check interval is reached
          */
-        public boolean isCheckIntervalFinished(TimedCircuitBreaker breaker,
+        public boolean isCheckIntervalFinished(EventCountCircuitBreaker breaker,
                 CheckIntervalData currentData, long now) {
             return now - currentData.getCheckIntervalStart() > fetchCheckInterval(breaker);
         }
@@ -351,7 +482,7 @@ public class TimedCircuitBreaker extends AbstractCircuitBreaker<Integer> {
          * @param nextData the updated {@code CheckIntervalData} object
          * @return a flag whether a state transition should be performed
          */
-        public abstract boolean isStateTransition(TimedCircuitBreaker breaker,
+        public abstract boolean isStateTransition(EventCountCircuitBreaker breaker,
                 CheckIntervalData currentData, CheckIntervalData nextData);
 
         /**
@@ -361,7 +492,7 @@ public class TimedCircuitBreaker extends AbstractCircuitBreaker<Integer> {
          * @param breaker the {@code CircuitBreaker}
          * @return the check interval to be applied
          */
-        protected abstract long fetchCheckInterval(TimedCircuitBreaker breaker);
+        protected abstract long fetchCheckInterval(EventCountCircuitBreaker breaker);
     }
 
     /**
@@ -370,13 +501,13 @@ public class TimedCircuitBreaker extends AbstractCircuitBreaker<Integer> {
     private static class StateStrategyClosed extends StateStrategy {
 
         @Override
-        public boolean isStateTransition(TimedCircuitBreaker breaker,
+        public boolean isStateTransition(EventCountCircuitBreaker breaker,
                 CheckIntervalData currentData, CheckIntervalData nextData) {
             return nextData.getEventCount() > breaker.getOpeningThreshold();
         }
 
         @Override
-        protected long fetchCheckInterval(TimedCircuitBreaker breaker) {
+        protected long fetchCheckInterval(EventCountCircuitBreaker breaker) {
             return breaker.getOpeningInterval();
         }
     }
@@ -386,7 +517,7 @@ public class TimedCircuitBreaker extends AbstractCircuitBreaker<Integer> {
      */
     private static class StateStrategyOpen extends StateStrategy {
         @Override
-        public boolean isStateTransition(TimedCircuitBreaker breaker,
+        public boolean isStateTransition(EventCountCircuitBreaker breaker,
                 CheckIntervalData currentData, CheckIntervalData nextData) {
             return nextData.getCheckIntervalStart() != currentData
                     .getCheckIntervalStart()
@@ -394,7 +525,7 @@ public class TimedCircuitBreaker extends AbstractCircuitBreaker<Integer> {
         }
 
         @Override
-        protected long fetchCheckInterval(TimedCircuitBreaker breaker) {
+        protected long fetchCheckInterval(EventCountCircuitBreaker breaker) {
             return breaker.getClosingInterval();
         }
     }

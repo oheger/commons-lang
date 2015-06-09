@@ -34,7 +34,7 @@ import org.junit.Test;
 /**
  * Test class for {@code TimedCircuitBreaker}.
  */
-public class TimedCircuitBreakerTest {
+public class EventCountCircuitBreakerTest {
     /** Constant for the opening threshold. */
     private static final int OPENING_THRESHOLD = 10;
 
@@ -49,7 +49,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testIntervalCalculation() {
-        TimedCircuitBreaker breaker = new TimedCircuitBreaker(OPENING_THRESHOLD, 1,
+        EventCountCircuitBreaker breaker = new EventCountCircuitBreaker(OPENING_THRESHOLD, 1,
                 TimeUnit.SECONDS, CLOSING_THRESHOLD, 2, TimeUnit.MILLISECONDS);
         assertEquals("Wrong opening interval", NANO_FACTOR, breaker.getOpeningInterval());
         assertEquals("Wrong closing interval", 2 * NANO_FACTOR / 1000,
@@ -62,7 +62,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testDefaultClosingInterval() {
-        TimedCircuitBreaker breaker = new TimedCircuitBreaker(OPENING_THRESHOLD, 1,
+        EventCountCircuitBreaker breaker = new EventCountCircuitBreaker(OPENING_THRESHOLD, 1,
                 TimeUnit.SECONDS, CLOSING_THRESHOLD);
         assertEquals("Wrong closing interval", NANO_FACTOR, breaker.getClosingInterval());
     }
@@ -73,7 +73,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testDefaultClosingThreshold() {
-        TimedCircuitBreaker breaker = new TimedCircuitBreaker(OPENING_THRESHOLD, 1,
+        EventCountCircuitBreaker breaker = new EventCountCircuitBreaker(OPENING_THRESHOLD, 1,
                 TimeUnit.SECONDS);
         assertEquals("Wrong closing interval", NANO_FACTOR, breaker.getClosingInterval());
         assertEquals("Wrong closing threshold", OPENING_THRESHOLD,
@@ -85,7 +85,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testInitiallyClosed() {
-        TimedCircuitBreaker breaker = new TimedCircuitBreaker(OPENING_THRESHOLD, 1,
+        EventCountCircuitBreaker breaker = new EventCountCircuitBreaker(OPENING_THRESHOLD, 1,
                 TimeUnit.SECONDS);
         assertFalse("Open", breaker.isOpen());
         assertTrue("Not closed", breaker.isClosed());
@@ -96,7 +96,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testNow() {
-        TimedCircuitBreaker breaker = new TimedCircuitBreaker(OPENING_THRESHOLD, 1,
+        EventCountCircuitBreaker breaker = new EventCountCircuitBreaker(OPENING_THRESHOLD, 1,
                 TimeUnit.SECONDS);
         long now = breaker.now();
         long delta = Math.abs(System.nanoTime() - now);
@@ -110,7 +110,7 @@ public class TimedCircuitBreakerTest {
     @Test
     public void testNotOpeningUnderThreshold() {
         long startTime = 1000;
-        TimedCircuitBreakerTestImpl breaker = new TimedCircuitBreakerTestImpl(OPENING_THRESHOLD, 1,
+        EventCountCircuitBreakerTestImpl breaker = new EventCountCircuitBreakerTestImpl(OPENING_THRESHOLD, 1,
                 TimeUnit.SECONDS, CLOSING_THRESHOLD, 1, TimeUnit.SECONDS);
         for (int i = 0; i < OPENING_THRESHOLD - 1; i++) {
             assertTrue("In open state", breaker.at(startTime).incrementAndCheckState());
@@ -127,7 +127,7 @@ public class TimedCircuitBreakerTest {
     public void testNotOpeningCheckIntervalExceeded() {
         long startTime = 0L;
         long timeIncrement = 3 * NANO_FACTOR / (2 * OPENING_THRESHOLD);
-        TimedCircuitBreakerTestImpl breaker = new TimedCircuitBreakerTestImpl(OPENING_THRESHOLD, 1,
+        EventCountCircuitBreakerTestImpl breaker = new EventCountCircuitBreakerTestImpl(OPENING_THRESHOLD, 1,
                 TimeUnit.SECONDS, CLOSING_THRESHOLD, 1, TimeUnit.SECONDS);
         for (int i = 0; i < 5 * OPENING_THRESHOLD; i++) {
             assertTrue("In open state", breaker.at(startTime).incrementAndCheckState());
@@ -143,7 +143,7 @@ public class TimedCircuitBreakerTest {
     public void testOpeningWhenThresholdReached() {
         long startTime = 0;
         long timeIncrement = NANO_FACTOR / OPENING_THRESHOLD - 1;
-        TimedCircuitBreakerTestImpl breaker = new TimedCircuitBreakerTestImpl(OPENING_THRESHOLD, 1,
+        EventCountCircuitBreakerTestImpl breaker = new EventCountCircuitBreakerTestImpl(OPENING_THRESHOLD, 1,
                 TimeUnit.SECONDS, CLOSING_THRESHOLD, 1, TimeUnit.SECONDS);
         boolean open = false;
         for (int i = 0; i < OPENING_THRESHOLD + 1; i++) {
@@ -160,7 +160,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testNotClosingOverThreshold() {
-        TimedCircuitBreakerTestImpl breaker = new TimedCircuitBreakerTestImpl(OPENING_THRESHOLD,
+        EventCountCircuitBreakerTestImpl breaker = new EventCountCircuitBreakerTestImpl(OPENING_THRESHOLD,
                 10, TimeUnit.SECONDS, CLOSING_THRESHOLD, 1, TimeUnit.SECONDS);
         long startTime = 0;
         breaker.open();
@@ -179,7 +179,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testClosingWhenThresholdReached() {
-        TimedCircuitBreakerTestImpl breaker = new TimedCircuitBreakerTestImpl(OPENING_THRESHOLD,
+        EventCountCircuitBreakerTestImpl breaker = new EventCountCircuitBreakerTestImpl(OPENING_THRESHOLD,
                 10, TimeUnit.SECONDS, CLOSING_THRESHOLD, 1, TimeUnit.SECONDS);
         breaker.open();
         breaker.at(1000).incrementAndCheckState();
@@ -196,7 +196,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testOpenStartsNewCheckInterval() {
-        TimedCircuitBreakerTestImpl breaker = new TimedCircuitBreakerTestImpl(OPENING_THRESHOLD, 2,
+        EventCountCircuitBreakerTestImpl breaker = new EventCountCircuitBreakerTestImpl(OPENING_THRESHOLD, 2,
                 TimeUnit.SECONDS, CLOSING_THRESHOLD, 1, TimeUnit.SECONDS);
         breaker.at(NANO_FACTOR - 1000).open();
         assertTrue("Not open", breaker.isOpen());
@@ -209,7 +209,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testAutomaticOpenStartsNewCheckInterval() {
-        TimedCircuitBreakerTestImpl breaker = new TimedCircuitBreakerTestImpl(OPENING_THRESHOLD, 2,
+        EventCountCircuitBreakerTestImpl breaker = new EventCountCircuitBreakerTestImpl(OPENING_THRESHOLD, 2,
                 TimeUnit.SECONDS, CLOSING_THRESHOLD, 1, TimeUnit.SECONDS);
         long time = 10 * NANO_FACTOR;
         for (int i = 0; i <= OPENING_THRESHOLD; i++) {
@@ -227,7 +227,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testClose() {
-        TimedCircuitBreakerTestImpl breaker = new TimedCircuitBreakerTestImpl(OPENING_THRESHOLD, 2,
+        EventCountCircuitBreakerTestImpl breaker = new EventCountCircuitBreakerTestImpl(OPENING_THRESHOLD, 2,
                 TimeUnit.SECONDS, CLOSING_THRESHOLD, 1, TimeUnit.SECONDS);
         long time = 0;
         for (int i = 0; i <= OPENING_THRESHOLD; i++, time += 1000) {
@@ -244,7 +244,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testChangeEvents() {
-        TimedCircuitBreaker breaker = new TimedCircuitBreaker(OPENING_THRESHOLD, 1,
+        EventCountCircuitBreaker breaker = new EventCountCircuitBreaker(OPENING_THRESHOLD, 1,
                 TimeUnit.SECONDS);
         ChangeListener listener = new ChangeListener(breaker);
         breaker.addChangeListener(listener);
@@ -258,7 +258,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testRemoveChangeListener() {
-        TimedCircuitBreaker breaker = new TimedCircuitBreaker(OPENING_THRESHOLD, 1,
+        EventCountCircuitBreaker breaker = new EventCountCircuitBreaker(OPENING_THRESHOLD, 1,
                 TimeUnit.SECONDS);
         ChangeListener listener = new ChangeListener(breaker);
         breaker.addChangeListener(listener);
@@ -274,7 +274,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testStateTransitionGuarded() throws InterruptedException {
-        final TimedCircuitBreaker breaker = new TimedCircuitBreaker(OPENING_THRESHOLD, 1,
+        final EventCountCircuitBreaker breaker = new EventCountCircuitBreaker(OPENING_THRESHOLD, 1,
                 TimeUnit.SECONDS);
         ChangeListener listener = new ChangeListener(breaker);
         breaker.addChangeListener(listener);
@@ -308,7 +308,7 @@ public class TimedCircuitBreakerTest {
      */
     @Test
     public void testChangeEventsGeneratedByAutomaticTransitions() {
-        TimedCircuitBreakerTestImpl breaker = new TimedCircuitBreakerTestImpl(OPENING_THRESHOLD, 2,
+        EventCountCircuitBreakerTestImpl breaker = new EventCountCircuitBreakerTestImpl(OPENING_THRESHOLD, 2,
                 TimeUnit.SECONDS, CLOSING_THRESHOLD, 1, TimeUnit.SECONDS);
         ChangeListener listener = new ChangeListener(breaker);
         breaker.addChangeListener(listener);
@@ -326,13 +326,13 @@ public class TimedCircuitBreakerTest {
      * This is useful for the creation of deterministic tests for switching the circuit
      * breaker's state.
      */
-    private static class TimedCircuitBreakerTestImpl extends TimedCircuitBreaker {
+    private static class EventCountCircuitBreakerTestImpl extends EventCountCircuitBreaker {
         /** The current time in nanoseconds. */
         private long currentTime;
 
-        public TimedCircuitBreakerTestImpl(int openingThreshold, long openingInterval,
-                TimeUnit openingUnit, int closingThreshold, long closingInterval,
-                TimeUnit closingUnit) {
+        public EventCountCircuitBreakerTestImpl(int openingThreshold, long openingInterval,
+                                                TimeUnit openingUnit, int closingThreshold, long closingInterval,
+                                                TimeUnit closingUnit) {
             super(openingThreshold, openingInterval, openingUnit, closingThreshold,
                     closingInterval, closingUnit);
         }
@@ -343,7 +343,7 @@ public class TimedCircuitBreakerTest {
          * @param time the time to set
          * @return a reference to this object
          */
-        public TimedCircuitBreakerTestImpl at(long time) {
+        public EventCountCircuitBreakerTestImpl at(long time) {
             currentTime = time;
             return this;
         }
