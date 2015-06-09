@@ -24,23 +24,25 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * <p>
  * A simple implementation of the <a
- * href="http://martinfowler.com/bliki/CircuitBreaker.html">Circuit Breaker</a> pattern.
+ * href="http://martinfowler.com/bliki/CircuitBreaker.html">Circuit Breaker</a> pattern
+ * that counts specific events.
  * </p>
  * <p>
  * A <em>circuit breaker</em> can be used to protect an application against unreliable
- * services or unexpected load. A newly created {@code CircuitBreaker} object is initially
- * in state <em>closed</em> meaning that no problem has been detected. When the
- * application encounters errors, it tells the circuit breaker to increment an internal
- * counter. If the number of errors reported in a specific time interval exceeds a
- * configurable threshold, the circuit breaker changes into state <em>open</em>. This
- * means that there is a problem with the associated sub system; the application should no
- * longer call it, but give it some time to settle down. The circuit breaker can be
- * configured to switch back to <em>closed</em> state after a certain time frame if the
- * number of errors received goes below a threshold.
+ * services or unexpected load. A newly created {@code EventCountCircuitBreaker} object is
+ * initially in state <em>closed</em> meaning that no problem has been detected. When the
+ * application encounters specific events (like errors or service timeouts), it tells the
+ * circuit breaker to increment an internal counter. If the number of events reported in a
+ * specific time interval exceeds a configurable threshold, the circuit breaker changes
+ * into state <em>open</em>. This means that there is a problem with the associated sub
+ * system; the application should no longer call it, but give it some time to settle down.
+ * The circuit breaker can be configured to switch back to <em>closed</em> state after a
+ * certain time frame if the number of events received goes below a threshold.
  * </p>
  * <p>
- * When a {@code CircuitBreaker} object is constructed the following parameters can be
- * provided:
+ * When a {@code EventCountCircuitBreaker} object is constructed the following parameters
+ * can be provided:
+ * </p>
  * <ul>
  * <li>A threshold for the number of events that causes a state transition to
  * <em>open</em> state. If more events are received in the configured check interval, the
@@ -54,7 +56,6 @@ import java.util.concurrent.atomic.AtomicReference;
  * a slightly lower threshold for closing the circuit breaker than for opening it to avoid
  * continuously flipping when the number of events received is close to the threshold.</li>
  * </ul>
- * </p>
  * <p>
  * This class supports the following typical use cases:
  * </p>
@@ -65,15 +66,16 @@ import java.util.concurrent.atomic.AtomicReference;
  * Imagine you have a server which can handle a certain number of requests per minute.
  * Suddenly, the number of requests increases significantly - maybe because a connected
  * partner system is going mad or due to a denial of service attack. A
- * {@code CircuitBreaker} can be configured to stop the application from processing
- * requests when a sudden peak load is detected and to start request processing again when
- * things calm down. The following code fragment shows a typical example of such a
- * scenario. Here the {@code CircuitBreaker} allows up to 1000 requests per minute before
- * it interferes. When the load goes down again to 800 requests per second it switches
- * back to state <em>closed</em>:
+ * {@code EventCountCircuitBreaker} can be configured to stop the application from
+ * processing requests when a sudden peak load is detected and to start request processing
+ * again when things calm down. The following code fragment shows a typical example of
+ * such a scenario. Here the {@code EventCountCircuitBreaker} allows up to 1000 requests
+ * per minute before it interferes. When the load goes down again to 800 requests per
+ * second it switches back to state <em>closed</em>:
+ * </p>
  *
  * <pre>
- * CircuitBreaker breaker = new CircuitBreaker(1000, 1, TimeUnit.MINUTE, 800);
+ * EventCountCircuitBreaker breaker = new EventCountCircuitBreaker(1000, 1, TimeUnit.MINUTE, 800);
  * ...
  * public void handleRequest(Request request) {
  *     if (breaker.incrementAndCheckState()) {
@@ -83,8 +85,6 @@ import java.util.concurrent.atomic.AtomicReference;
  *     }
  * }
  * </pre>
- *
- * </p>
  * <p>
  * <strong>Deal with an unreliable service</strong>
  * </p>
@@ -94,9 +94,10 @@ import java.util.concurrent.atomic.AtomicReference;
  * called for a while. This can be achieved using the following pattern - in this concrete
  * example we accept up to 5 errors in 2 minutes; if this limit is reached, the service is
  * given a rest time of 10 minutes:
+ * </p>
  *
  * <pre>
- * CircuitBreaker breaker = new CircuitBreaker(5, 2, TimeUnit.MINUTE, 5, 10, TimeUnit.MINUTE);
+ * EventCountCircuitBreaker breaker = new EventCountCircuitBreaker(5, 2, TimeUnit.MINUTE, 5, 10, TimeUnit.MINUTE);
  * ...
  * public void handleRequest(Request request) {
  *     if (breaker.checkState()) {
@@ -110,8 +111,6 @@ import java.util.concurrent.atomic.AtomicReference;
  *     }
  * }
  * </pre>
- *
- * </p>
  * <p>
  * In addition to automatic state transitions, the state of a circuit breaker can be
  * changed manually using the methods {@link #open()} and {@link #close()}. It is also
@@ -121,6 +120,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * </p>
  * <p>
  * <em>Implementation notes:</em>
+ * </p>
  * <ul>
  * <li>This implementation uses non-blocking algorithms to update the internal counter and
  * state. This should be pretty efficient if there is not too much contention.</li>
@@ -133,7 +133,6 @@ import java.util.concurrent.atomic.AtomicReference;
  * guarantee that the circuit breaker is triggered at a specific point in time; there may
  * be some delay (less than a check interval).</li>
  * </ul>
- * </p>
  *
  * @since 3.4
  */
@@ -158,7 +157,7 @@ public class EventCountCircuitBreaker extends AbstractCircuitBreaker<Integer> {
     private final long closingInterval;
 
     /**
-     * Creates a new instance of {@code CircuitBreaker} and initializes all properties for
+     * Creates a new instance of {@code EventCountCircuitBreaker} and initializes all properties for
      * opening and closing it based on threshold values for events occurring in specific
      * intervals.
      *
@@ -185,7 +184,7 @@ public class EventCountCircuitBreaker extends AbstractCircuitBreaker<Integer> {
     }
 
     /**
-     * Creates a new instance of {@code CircuitBreaker} with the same interval for opening
+     * Creates a new instance of {@code EventCountCircuitBreaker} with the same interval for opening
      * and closing checks.
      *
      * @param openingThreshold the threshold for opening the circuit breaker; if this
@@ -204,7 +203,7 @@ public class EventCountCircuitBreaker extends AbstractCircuitBreaker<Integer> {
     }
 
     /**
-     * Creates a new instance of {@code CircuitBreaker} which uses the same parameters for
+     * Creates a new instance of {@code EventCountCircuitBreaker} which uses the same parameters for
      * opening and closing checks.
      *
      * @param threshold the threshold for changing the status of the circuit breaker; if
@@ -257,6 +256,11 @@ public class EventCountCircuitBreaker extends AbstractCircuitBreaker<Integer> {
         return closingInterval;
     }
 
+    /**
+     * {@inheritDoc} This implementation checks the internal event counter against the
+     * threshold values and the check intervals. This may cause a state change of this
+     * circuit breaker.
+     */
     @Override
     public boolean checkState() {
         return performStateCheck(0);
@@ -272,12 +276,24 @@ public class EventCountCircuitBreaker extends AbstractCircuitBreaker<Integer> {
         return incrementAndCheckState(1);
     }
 
+    /**
+     * {@inheritDoc} This circuit breaker may close itself again if the number of events
+     * received during a check interval goes below the closing threshold. If this circuit
+     * breaker is already open, this method has no effect, except that a new check
+     * interval is started.
+     */
     @Override
     public void open() {
         super.open();
         checkIntervalData.set(new CheckIntervalData(0, now()));
     }
 
+    /**
+     * {@inheritDoc} A new check interval is started. If too many events are received in
+     * this interval, the circuit breaker changes again to state open. If this circuit
+     * breaker is already closed, this method has no effect, except that a new check
+     * interval is started.
+     */
     @Override
     public void close() {
         super.close();
