@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 
 /**
- * Test class for {@code TimedCircuitBreaker}.
+ * Test class for {@code EventCountCircuitBreaker}.
  */
 public class EventCountCircuitBreakerTest {
     /** Constant for the opening threshold. */
@@ -322,7 +322,7 @@ public class EventCountCircuitBreakerTest {
     }
 
     /**
-     * A test implementation of {@code TimedCircuitBreaker} which supports mocking the timer.
+     * A test implementation of {@code EventCountCircuitBreaker} which supports mocking the timer.
      * This is useful for the creation of deterministic tests for switching the circuit
      * breaker's state.
      */
