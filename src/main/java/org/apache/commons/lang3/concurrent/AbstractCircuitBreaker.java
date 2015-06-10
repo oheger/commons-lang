@@ -1,9 +1,30 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.commons.lang3.concurrent;
 
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * Base class for circuit breakers.
+ *
+ * @param <T> the type of the value monitored by this circuit breaker
+ */
 public abstract class AbstractCircuitBreaker<T> implements CircuitBreaker<T> {
     /**
      * The name of the <em>open</em> property as it is passed to registered
@@ -12,32 +33,52 @@ public abstract class AbstractCircuitBreaker<T> implements CircuitBreaker<T> {
     public static final String PROPERTY_NAME = "open";
 
     /** The current state of this circuit breaker. */
-    protected final AtomicReference<State> state = new AtomicReference<State>(
-            State.CLOSED);
+    protected final AtomicReference<State> state = new AtomicReference<State>(State.CLOSED);
 
     /** An object for managing change listeners registered at this instance. */
     private final PropertyChangeSupport changeSupport;
 
+    /**
+     * Creates an {@AbstractCircuitBreaker}. It also creates an internal {@code PropertyChangeSupport}.
+     */
     public AbstractCircuitBreaker() {
         changeSupport = new PropertyChangeSupport(this);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public boolean isOpen() {
         return isOpen(state.get());
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public boolean isClosed() {
         return !isOpen();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public abstract boolean checkState();
 
+    /**
+     * {@inheritDoc}
+     */
     public abstract boolean incrementAndCheckState(T increment);
 
+    /**
+     * {@inheritDoc}
+     */
     public void close() {
         changeState(State.CLOSED);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void open() {
         changeState(State.OPEN);
     }
@@ -60,8 +101,7 @@ public abstract class AbstractCircuitBreaker<T> implements CircuitBreaker<T> {
      */
     protected void changeState(State newState) {
         if (state.compareAndSet(newState.oppositeState(), newState)) {
-            changeSupport.firePropertyChange(PROPERTY_NAME, !isOpen(newState),
-                    isOpen(newState));
+            changeSupport.firePropertyChange(PROPERTY_NAME, !isOpen(newState), isOpen(newState));
         }
     }
 
@@ -93,6 +133,9 @@ public abstract class AbstractCircuitBreaker<T> implements CircuitBreaker<T> {
      */
     protected static enum State {
         CLOSED {
+            /**
+             * {@inheritDoc}
+             */
             @Override
             public State oppositeState() {
                 return OPEN;
@@ -100,6 +143,9 @@ public abstract class AbstractCircuitBreaker<T> implements CircuitBreaker<T> {
         },
 
         OPEN {
+            /**
+             * {@inheritDoc}
+             */
             @Override
             public State oppositeState() {
                 return CLOSED;

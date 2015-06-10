@@ -133,8 +133,6 @@ import java.util.concurrent.atomic.AtomicReference;
  * guarantee that the circuit breaker is triggered at a specific point in time; there may
  * be some delay (less than a check interval).</li>
  * </ul>
- *
- * @since 3.4
  */
 public class EventCountCircuitBreaker extends AbstractCircuitBreaker<Integer> {
 
@@ -266,12 +264,23 @@ public class EventCountCircuitBreaker extends AbstractCircuitBreaker<Integer> {
         return performStateCheck(0);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean incrementAndCheckState(Integer increment)
             throws CircuitBreakingException {
         return performStateCheck(1);
     }
 
+    /**
+     * Increments the monitored value by <strong>1</strong> and performs a check of the current state of this
+     * circuit breaker. This method works like {@link #checkState()}, but the monitored
+     * value is incremented before the state check is performed.
+     *
+     * @return <strong>true</strong> if the circuit breaker is now closed;
+     * <strong>false</strong> otherwise
+     */
     public boolean incrementAndCheckState() {
         return incrementAndCheckState(1);
     }
@@ -340,7 +349,7 @@ public class EventCountCircuitBreaker extends AbstractCircuitBreaker<Integer> {
      */
     private boolean updateCheckIntervalData(CheckIntervalData currentData,
             CheckIntervalData nextData) {
-        return (currentData == nextData)
+        return currentData == nextData
                 || checkIntervalData.compareAndSet(currentData, nextData);
     }
 
@@ -396,9 +405,6 @@ public class EventCountCircuitBreaker extends AbstractCircuitBreaker<Integer> {
      */
     private static StateStrategy stateStrategy(State state) {
         StateStrategy strategy = STRATEGY_MAP.get(state);
-        if (strategy == null) {
-            throw new CircuitBreakingException("Invalid state: " + state);
-        }
         return strategy;
     }
 
@@ -516,12 +522,18 @@ public class EventCountCircuitBreaker extends AbstractCircuitBreaker<Integer> {
      */
     private static class StateStrategyClosed extends StateStrategy {
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public boolean isStateTransition(EventCountCircuitBreaker breaker,
                 CheckIntervalData currentData, CheckIntervalData nextData) {
             return nextData.getEventCount() > breaker.getOpeningThreshold();
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         protected long fetchCheckInterval(EventCountCircuitBreaker breaker) {
             return breaker.getOpeningInterval();
@@ -532,6 +544,9 @@ public class EventCountCircuitBreaker extends AbstractCircuitBreaker<Integer> {
      * A specialized {@code StateStrategy} implementation for the state open.
      */
     private static class StateStrategyOpen extends StateStrategy {
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public boolean isStateTransition(EventCountCircuitBreaker breaker,
                 CheckIntervalData currentData, CheckIntervalData nextData) {
@@ -540,6 +555,9 @@ public class EventCountCircuitBreaker extends AbstractCircuitBreaker<Integer> {
                     && currentData.getEventCount() < breaker.getClosingThreshold();
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         protected long fetchCheckInterval(EventCountCircuitBreaker breaker) {
             return breaker.getClosingInterval();

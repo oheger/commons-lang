@@ -85,6 +85,7 @@ public interface CircuitBreaker<T> {
      * circuit breaker. This method works like {@link #checkState()}, but the monitored
      * value is incremented before the state check is performed.
      *
+     * @param increment value to increment in the monitored value of the circuit breaker
      * @return <strong>true</strong> if the circuit breaker is now closed;
      * <strong>false</strong> otherwise
      */
